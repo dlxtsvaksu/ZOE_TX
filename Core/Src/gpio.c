@@ -51,34 +51,28 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SE_GPIO_Port, SE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, PWR_EN_Pin|LED_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(PWR_EN_GPIO_Port, PWR_EN_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : SE_Pin */
-  GPIO_InitStruct.Pin = SE_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SE_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SD1_Pin SD2_Pin */
-  GPIO_InitStruct.Pin = SD1_Pin|SD2_Pin;
+  /*Configure GPIO pins : SF_Pin SD1_Pin SD2_Pin */
+  GPIO_InitStruct.Pin = SF_Pin|SD1_Pin|SD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SF_Pin SA_Pin TRIM6_Pin */
-  GPIO_InitStruct.Pin = SF_Pin|SA_Pin|TRIM6_Pin;
+  /*Configure GPIO pins : SE_Pin SA_Pin TRIM8_Pin TRIM7_Pin
+                           TRIM_MODE_Pin TRIM6_Pin */
+  GPIO_InitStruct.Pin = SE_Pin|SA_Pin|TRIM8_Pin|TRIM7_Pin
+                          |TRIM_MODE_Pin|TRIM6_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SC1_Pin SC2_Pin CHRAGE_Pin LED_Pin
-                           TRIM5_Pin TRIM4_Pin TRIM3_Pin SB_Pin */
-  GPIO_InitStruct.Pin = SC1_Pin|SC2_Pin|CHRAGE_Pin|LED_Pin
-                          |TRIM5_Pin|TRIM4_Pin|TRIM3_Pin|SB_Pin;
+  /*Configure GPIO pins : SC1_Pin SC2_Pin CHARGE_Pin TRIM5_Pin
+                           TRIM4_Pin TRIM3_Pin TRIM2_Pin TRIM1_Pin
+                           SB_Pin */
+  GPIO_InitStruct.Pin = SC1_Pin|SC2_Pin|CHARGE_Pin|TRIM5_Pin
+                          |TRIM4_Pin|TRIM3_Pin|TRIM2_Pin|TRIM1_Pin
+                          |SB_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -96,23 +90,18 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(PWR_EN_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TRIM8_Pin TRIM7_Pin TRIM_MODE_Pin */
-  GPIO_InitStruct.Pin = TRIM8_Pin|TRIM7_Pin|TRIM_MODE_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO pin : LED_Pin */
+  GPIO_InitStruct.Pin = LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_DETECT_Pin */
   GPIO_InitStruct.Pin = USB_DETECT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(USB_DETECT_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : TRIM2_Pin TRIM1_Pin */
-  GPIO_InitStruct.Pin = TRIM2_Pin|TRIM1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 

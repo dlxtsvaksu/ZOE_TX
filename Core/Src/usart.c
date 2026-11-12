@@ -53,7 +53,11 @@ void MX_USART2_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
-
+  /* 波特率补正(CRSF 走 USART2, 挂 APB1 = 36MHz):
+     HAL 的 UART_BRR_SAMPLING16 = (PCLK*25)/(4*baud) 整数除法会截掉低位 ->
+     36MHz/400k 本该是 BRR=90(0x5A, 400.000k, 误差 0%), 结果算成 89(0x59, 404.5k, +1.1%).
+     按 BRR = round(PCLK/baud) 重算一遍, CRSF 波特率严格 = 400000 */
+  huart2.Instance->BRR = (uint16_t)((HAL_RCC_GetPCLK1Freq() + (huart2.Init.BaudRate / 2U)) / huart2.Init.BaudRate);
   /* USER CODE END USART2_Init 2 */
 
 }

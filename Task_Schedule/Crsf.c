@@ -11,7 +11,7 @@
  *
  * @note 硬件: USART2(PA2=TX, PA3=RX), 400000 8N1
  *       TX = DMA1_Channel7(NORMAL), RX = DMA1_Channel6(CIRCULAR)
- *       (见 Elrs_tx.ioc: Dma.USART2_TX.1 / Dma.USART2_RX.4;
+ *       (见 ZOE_TX_V1.2.ioc: Dma.USART2_TX.0 / Dma.USART2_RX.1;
  *        DMA1_Channel4/5 是 OLED 的 I2C2_TX/RX, 不是本文件用的)
  */
 #include "Crsf.h"
@@ -644,7 +644,7 @@ void CRSF_Init(void)
 
   /* NVIC 自检: "TX 一直是 0" 最常见的原因就是中断没使能, 这里把它记下来供诊断页显示
      位序(对应诊断页 "I:" 后 4 个数字的顺序, 见 Schedule.c 第1页): bit0=TIM1_UP(4ms 节拍)
-       bit1=USART2  bit2=DMA1_Channel7(UART TX)  bit3=DMA1_Channel6(UART RX) —— 通道号照 Elrs_tx.ioc */
+       bit1=USART2  bit2=DMA1_Channel7(UART TX)  bit3=DMA1_Channel6(UART RX) —— 通道号照 ZOE_TX_V1.2.ioc */
   crsf_nvic_ok  = 0U;
   crsf_nvic_ok |= (uint8_t)(CRSF_IrqEnabled(TIM1_UP_IRQn)       ? 0x01U : 0U);
   crsf_nvic_ok |= (uint8_t)(CRSF_IrqEnabled(USART2_IRQn)        ? 0x02U : 0U);

@@ -35,7 +35,9 @@ extern "C" {
 extern ADC_HandleTypeDef hadc1;
 
 /* USER CODE BEGIN Private defines */
-
+extern volatile uint16_t ADC_Values[5];
+/* ADC1 的循环 DMA 句柄: 循环搬运不需要任何中断(见 main.c 里关中断的说明) */
+extern DMA_HandleTypeDef hdma_adc1;
 /* USER CODE END Private defines */
 
 void MX_ADC1_Init(void);

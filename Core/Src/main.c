@@ -28,7 +28,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "Schedule.h"
+#include "oled.h"
+#include "font.h"
+#include "Crsf.h"
+#include "Store.h"
+#include "Func.h"
+#include "Ppm.h"
+#include "UsbHid.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,7 +56,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -101,13 +107,35 @@ int main(void)
   MX_USB_PCD_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+  /* 启动 USB HID 摇杆(需在 MX_USB_PCD_Init 之后) */
+  USB_HID_Init();
+  /* 读取上次保存的摇杆校准参数(无有效数据则保持默认值) */
+  Store_LoadCalib();
+  Adc_CalibCheck();
+  Mix_LoadForModel(model_cur);   /* 只把当前模型的混控读进 RAM */
+  HAL_ADCEx_Calibration_Start(&hadc1);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ADC_Values, 5);
 
+  __HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_HT | DMA_IT_TC);
+  HAL_NVIC_DisableIRQ(DMA1_Channel1_IRQn);
+  /* OLED 内部上电复位(POR)比 STM32 启动慢: 先等 VCC 稳定再发初始化命令,
+     否则初段命令会被 NACK 丢弃, 表现为"上电有概率整屏偏移/翻转 180 度" */
+  HAL_Delay(100);
+  OLED_Init();
+  /* CRSF: 初始化收发缓冲并启动接收 DMA, 再由 TIM1(4ms) 提供 250Hz 发送节拍 */
+  CRSF_Init();
+  HAL_TIM_Base_Start_IT(&htim1);
+  /* PPM: TIM4_CH1(PB6) 输出航模 PPM(1us 时基 + 输出比较翻转, 见 Ppm.c);
+     TIM4 的时基(CH1 = Output Compare Toggle / PSC=71 / ARR=0xFFFF)已在 ZOE_TX_V1.2.ioc 里配好,
+     由 MX_TIM4_Init() 生成, 这里只负责启动 */
+  PPM_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    Schedule_Run();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

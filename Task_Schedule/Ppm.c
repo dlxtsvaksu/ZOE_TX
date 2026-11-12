@@ -20,7 +20,7 @@
  *       ch_out[] -> 脉宽的换算放在 PPM_Task(5ms 调度槽). 中断里不做换算/打印/阻塞调用.
  *
  * @note 配置在哪(本文件不做任何定时器配置):
- *  - 时基/模式/引脚都在 Elrs_tx.ioc 里, 由 CubeMX 生成到 tim.c 的 MX_TIM4_Init():
+ *  - 时基/模式/引脚都在 ZOE_TX_V1.2.ioc 里, 由 CubeMX 生成到 tim.c 的 MX_TIM4_Init():
  *    CH1 = Output Compare Toggle CH1(CCMR1.OC1M = 3), PSC = 71, ARR = 65535, PB6 = AF 推挽;
  *  - TIM4 的 NVIC(NVIC.TIM4_IRQn, 优先级 1)和中断入口 TIM4_IRQHandler 也在 .ioc 里,
  *    由 CubeMX 生成到 stm32f1xx_it.c, 本文件不再手写任何中断入口;

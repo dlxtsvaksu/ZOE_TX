@@ -45,11 +45,32 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Task_Schedule/Schedule.c
+    Task_Schedule/Func.c
+    Task_Schedule/Crsf.c
+    Task_Schedule/Ppm.c
+    Task_Schedule/Store.c
+    Task_Schedule/Ui.c
+    Task_Schedule/UsbHid.c
+    Task_Schedule/usbd_conf.c
+    Task_Schedule/usbd_desc.c
+    Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
+    Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c
+    Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c
+    Middlewares/ST/STM32_USB_Device_Library/Class/HID/Src/usbd_hid.c
+    oled_multi/font.c
+    oled_multi/oled.c
+
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    Task_Schedule
+    oled_multi
+    Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+    Middlewares/ST/STM32_USB_Device_Library/Class/HID/Inc
+
 )
 
 # Add project symbols (macros)

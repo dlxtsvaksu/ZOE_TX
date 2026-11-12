@@ -29,7 +29,7 @@ extern volatile uint16_t ppm_edge_cnt;    /* 已产生的沿数(正常约 2*PPM_
 extern volatile uint16_t ppm_frame_cnt;   /* 已输出的帧数(正常约 44/s) */
 extern volatile uint16_t ppm_frame_rate;  /* 实测帧率(帧/秒), 正常约 44 */
 
-void PPM_Init(void);                            /* 上电启动: 只有 HAL_TIM_OC_Start_IT, TIM4 配置全在 Elrs_tx.ioc/tim.c */
+void PPM_Init(void);                            /* 上电启动: 只有 HAL_TIM_OC_Start_IT, TIM4 配置全在 ZOE_TX_V1.2.ioc/tim.c */
 void PPM_Task(void);                            /* 5ms 槽: ch_out[] -> ppm_ch_us[] + 帧率统计 */
 void PPM_SetChannel(uint8_t ch, uint16_t us);   /* 直接指定某通道脉宽(us, 自动限幅) */
 

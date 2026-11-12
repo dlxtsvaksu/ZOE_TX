@@ -21,7 +21,7 @@
 #include "adc.h"
 
 /* USER CODE BEGIN 0 */
-
+volatile uint16_t ADC_Values[5];
 /* USER CODE END 0 */
 
 ADC_HandleTypeDef hadc1;
