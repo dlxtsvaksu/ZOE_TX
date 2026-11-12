@@ -73,6 +73,25 @@ extern volatile uint8_t Key_State_Now[4];    /* 按键当前电平: 1 = 按住 (
 extern volatile uint32_t Key_State_Time[4];  /* 队列里那条事件的产生时刻(HAL_GetTick): UI 用来丢过期事件 */
 extern volatile uint16_t Switch_State[6];   /* 0~5 = SA/SB/SC/SD/SE/SF, 值域见下 */
 
+/*============================微调(trim)=============================
+   4 个微调 trim1~trim4, 每个由一对实体按键控制(前一个减, 后一个加):
+     trim1 = TRIM6 / TRIM7      trim2 = TRIM5 / TRIM8
+     trim3 = TRIM2 / TRIM3(与导航键 EXIT / ENTER 同脚)
+     trim4 = TRIM4 / TRIM1(与导航键 DOWN / UP    同脚)
+   所以只有 trim_mode = 1(短按电源键切换, 见 Ui.c 的 UI_Task)时才让这 8 个键产生步进,
+   平时它们仍旧只当导航键用. 微调量单位 0.1% 满行程: ±200 = ±20%, 单击 5 = 0.5% */
+#define TRIM_NUM    4U     /* 微调个数: trim1~trim4 */
+#define TRIM_LIMIT  200    /* 微调上限(0.1% 满行程): ±200 = ±20% */
+#define TRIM_STEP   5      /* 单击步进(0.1% 满行程): 5 = 0.5% */
+extern volatile int16_t trim_val[TRIM_NUM];   /* 微调量(0.1% 满行程, ±TRIM_LIMIT) */
+extern volatile uint8_t aetr_trim[4];         /* 输出 i 挂哪个微调: 0 = 不挂, 1~4 = trim1~trim4 */
+extern volatile uint8_t aetr_trim_rev[4];     /* 输出 i 的微调方向: 0 = 正(+1), 1 = 反(-1) */
+extern volatile uint8_t trim_mode;            /* 1 = 微调模式(UI 里由电源键短按切换) */
+void    Trim_ModeToggleReq(void);             /* 请求切换微调模式(Schedule.c 电源键短按调用) */
+uint8_t Trim_ModeEvent(void);                 /* UI 消费一次切换请求: 1 = 有一次 */
+int16_t Trim_Counts(uint8_t n);               /* 第 n 个微调的偏移量(counts, 已按 ±20% 限幅) */
+void    Trim_Task(void);                      /* 10ms 槽: 8 个微调键去抖 + 长按加速 */
+
 #define crsf_min 172 
 #define crsf_mid 992
 #define crsf_max 1811

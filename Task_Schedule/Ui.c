@@ -34,6 +34,7 @@ void DiagShowPage(void);
 #define UI_PAGE_MIX   11U
 #define UI_PAGE_MIXED 12U
 #define UI_PAGE_VER   13U
+#define UI_PAGE_TRIMSET 14U
 
 #define UI_A_SYS    0U
 #define UI_A_CAL    2U
@@ -46,6 +47,7 @@ void DiagShowPage(void);
 #define UI_A_MODEL 14U
 #define UI_A_MIX   15U
 #define UI_A_VER   16U
+#define UI_A_TRIM  17U
 
 typedef struct {
     const char *label;
@@ -61,6 +63,7 @@ static const UI_MenuItem_t ui_items_root[] = {
 static const UI_MenuItem_t ui_items_sys[] = {
     { "校准", UI_A_CAL  },
     { "输入映射",     UI_A_INPUT },
+    { "微调分配",     UI_A_TRIM  },
     { "版本",   UI_A_VER  },
 
     { "返回",      UI_A_BACK },
@@ -79,6 +82,9 @@ static uint32_t ui_bind_stamp = 0U;   /* 对频弹窗出现时刻(用于 6 秒�
 /* 输入分配页(第8页)状态 */
 static uint8_t  ui_in_focus = 0U;      /* 0~7: 偶数 = SRC, 奇数 = DIR */
 static uint8_t  ui_in_edit  = 0U;      /* 1 = 正在编辑焦点格 */
+/* 微调分配页(第14页)状态 */
+static uint8_t  ui_tr_focus = 0U;      /* 0~7: 偶数 = 微调格, 奇数 = 方向格 */
+static uint8_t  ui_tr_edit  = 0U;      /* 1 = 正在编辑焦点行 */
 /* 混控页状态 */
 static uint8_t  ui_mix_ch    = 0U;      /* 选中的通道 0~15 */
 static uint8_t  ui_mix_focus = 0U;      /* 编辑器里的有效格编号 */
@@ -649,7 +655,7 @@ static uint8_t  ui_param_tries   = 0U;   /* 后台自动重扫参数表的次数
 /* ========================== 第1页: 菜单 ========================== */
 static const UI_MenuItem_t *UI_MenuItems(uint8_t *count)
 {
-    if (ui_menu == 1U) { *count = 4U; return ui_items_sys;  }   /* 校准/输入映射/版本/返回 */
+    if (ui_menu == 1U) { *count = 5U; return ui_items_sys;  }   /* 校准/输入映射/微调分配/版本/返回 */
     *count = 4U;
     return ui_items_root;
 }
@@ -670,13 +676,15 @@ static void UI_MenuPage(void)
         uint8_t first = 0U;
         uint8_t shown = count;
         uint8_t r;
-        if (count > 6U)                        /* 超过 6 条: 以光标为中心的滚动窗口 */
+        /* 屏幕 64px 高: 标题占 1~12, 正文只放 4 行(y=12/24/36/48 -> 墨迹到 59, 不压底边框).
+           原来的 6 行会让第 5/6 行被屏幕下沿裁掉. 超过 4 条时以光标为中心的滚动窗口 */
+        if (count > 4U)
         {
-            if (ui_cursor > 2U)
-                first = (uint8_t)(ui_cursor - 2U);
-            if ((uint8_t)(first + 6U) > count)
-                first = (uint8_t)(count - 6U);
-            shown = 6U;
+            if (ui_cursor > 1U)
+                first = (uint8_t)(ui_cursor - 1U);
+            if ((uint8_t)(first + 4U) > count)
+                first = (uint8_t)(count - 4U);
+            shown = 4U;
         }
         for (r = 0U; r < shown; r++)
         {
@@ -736,6 +744,12 @@ static void UI_DoAction(uint8_t action)
             ui_in_focus = 0U;
             ui_in_edit  = 0U;
             ui_cursor = 0U;
+            break;
+
+        case UI_A_TRIM:                              /* 微调分配页: trim1~4 -> Ail/Ele/Thr/Rud */
+            ui_tr_focus = 0U;
+            ui_tr_edit  = 0U;
+            ui_page     = UI_PAGE_TRIMSET;
             break;
 
         case UI_A_VER:                               /* 版本页: 纯静态, 只认 EXIT */
@@ -1196,6 +1210,107 @@ static void UI_PowerOffIdle(void)
     UI_Border(0U, 0U, 127U, 63U, UI_FRAME_CUT, OLED_COLOR_NORMAL);          /* 与关机页/开机页一致的倒角框 */
 }
 
+/* ========================== 第14页: 微调分配 + 微调弹窗 ========================== */
+/* 微调量 -> "+20.0%" / "-0.5%" / "+0.0%": 固定 6 字符(36px).
+   单位是 0.1% 满行程: trim_val = 200 就是 20.0%, 整数部分最多两位(a/10 = 0~20) */
+static void UI_TrimPct(uint8_t x, uint8_t y, int16_t v, OLED_ColorMode color)
+{
+    char     s[7];
+    uint16_t a = (uint16_t)((v < 0) ? -v : v);                   /* 0 ~ TRIM_LIMIT(200) */
+    uint8_t  t = (uint8_t)((a / 10U) / 10U);                     /* 整数的十位: 0~2 */
+
+    s[0] = (v < 0) ? (char)0x2D : (char)0x2B;                    /* - / + */
+    s[1] = (t != 0U) ? (char)(0x30 + t) : (char)0x20;            /* 十位为 0 时填空格: 不出现 +01.0% */
+    s[2] = (char)(0x30 + (uint8_t)((a / 10U) % 10U));            /* 整数的个位 */
+    s[3] = (char)0x2E;                                           /* . */
+    s[4] = (char)(0x30 + (uint8_t)(a % 10U));                    /* 0.1% 位 */
+    s[5] = (char)0x25;                                           /* % */
+    s[6] = (char)0;
+    OLED_PrintASCIIString(x, y, s, &afont8x6, color);
+}
+
+/* 微调模式弹窗(白底黑字 + 内缩 1px 黑框, 盖在当前页面上):
+   标题 微调, 右上角 PWR 提示"再短按一次电源键退出"; 每行 = 输出字母 / 挂的微调号 / 当前偏移量.
+   数值直接读 trim_val, Trim_Task 每 10ms 更新 -> 按住微调键时实时变化 */
+static void UI_TrimPopup(void)
+{
+    static const char ch[4] = { 'A', 'E', 'T', 'R' };   /* Ail / Ele / Thr / Rud */
+    uint8_t i;
+
+    OLED_DrawFilledRectangle(10, 8, 106, 48, OLED_COLOR_NORMAL);   /* 白底 10..116 x 8..55 */
+    OLED_DrawRectangle(11, 9, 104, 45, OLED_COLOR_REVERSED);        /* 内缩 1px 黑框 11..115 x 9..54 */
+
+    OLED_PrintString(16, 10, "微调", &font12x12, OLED_COLOR_REVERSED);
+    OLED_PrintASCIIString(96, 10, "PWR", &afont12x6, OLED_COLOR_REVERSED);
+
+    for (i = 0U; i < 4U; i++)
+    {
+        uint8_t y = (uint8_t)(22U + (i * 8U));
+        uint8_t t = aetr_trim[i];
+        char    s[3];
+
+        s[0] = ch[i]; s[1] = (char)0;
+        OLED_PrintASCIIString(16, y, s, &afont8x6, OLED_COLOR_REVERSED);
+
+        if ((t >= 1U) && (t <= TRIM_NUM)) { s[0] = (char)0x54; s[1] = (char)(0x30 + t); }   /* T1~T4 */
+        else                              { s[0] = (char)0x2D; s[1] = (char)0x2D; }          /* -- */
+        s[2] = (char)0;
+        OLED_PrintASCIIString(26, y, s, &afont8x6, OLED_COLOR_REVERSED);
+
+        if ((t >= 1U) && (t <= TRIM_NUM))
+            UI_TrimPct(78, y, trim_val[t - 1U], OLED_COLOR_REVERSED);
+    }
+}
+
+/* 第14页(系统菜单 -> 微调分配): 与"输入映射"页同一套格式(三列 + 每行两个焦点格):
+     输出名(x=1) / 微调格(x=40, 焦点框 40..57) / 方向格(x=84, 焦点框 84..95).
+   微调格 = --/T1~T4(该输出挂哪一路微调); 方向格 = +1 正 / -1 反(微调在该输出上的作用方向);
+   中间 x=60 是实体键提示(T6/7 = TRIM6 减 / TRIM7 加), 不参与焦点.
+   焦点态: UP/DN 循环 8 格(长按加速), ENTER 进编辑, EXIT 保存并返回菜单
+   编辑态: 微调格 UP/DN 循环 --/T1/T2/T3/T4; 方向格 UP=+1 正, DOWN=-1 反;
+           ENTER 保存退出编辑, EXIT 保存并返回菜单
+   "--" = 该输出不挂微调; 同一个微调可以同时挂多个输出(不去重, 与常见遥控一致) */
+static void UI_TrimSetPage(void)
+{
+    static const char *nm[4] = { "Ail", "Ele", "Thr", "Rud" };
+    static const char *kb[TRIM_NUM] = { "T6/7", "T5/8", "T2/3", "T4/1" };
+    uint8_t i;
+
+    OLED_NewFrame();
+    OLED_PrintString(1, 1, "输出  微调  方向", &font12x12, OLED_COLOR_NORMAL);
+
+    for (i = 0U; i < 4U; i++)
+    {
+        uint8_t y  = (uint8_t)(12U + (i * 8U));
+        uint8_t tc = (uint8_t)(i * 2U);                 /* 微调格编号 */
+        uint8_t dc = (uint8_t)(tc + 1U);                /* 方向格编号 */
+        uint8_t t  = aetr_trim[i];
+        char    s[5];
+
+        s[0] = nm[i][0]; s[1] = nm[i][1]; s[2] = nm[i][2]; s[3] = (char)0;
+        OLED_PrintASCIIString(1, y, s, &afont8x6, OLED_COLOR_NORMAL);
+
+        if ((t >= 1U) && (t <= TRIM_NUM)) { s[0] = (char)0x54; s[1] = (char)(0x30 + t); }   /* T1~T4 */
+        else                              { s[0] = (char)0x2D; s[1] = (char)0x2D; }          /* -- */
+        s[2] = (char)0;
+        if (ui_tr_focus == tc)
+            OLED_DrawFilledRectangle(40, y, 18, 8, OLED_COLOR_NORMAL);
+        OLED_PrintASCIIString(40, y, s, &afont8x6, (ui_tr_focus == tc) ? OLED_COLOR_REVERSED : OLED_COLOR_NORMAL);
+
+        if ((t >= 1U) && (t <= TRIM_NUM))               /* 实体键提示: 塞在中间空档, 不参与焦点 */
+            OLED_PrintASCIIString(60, y, (char *)kb[t - 1U], &afont8x6, OLED_COLOR_NORMAL);
+
+        s[0] = (aetr_trim_rev[i] != 0U) ? (char)0x2D : (char)0x2B;   /* -1 反 / +1 正 */
+        s[1] = (char)0x31;
+        s[2] = (char)0;
+        if (ui_tr_focus == dc)
+            OLED_DrawFilledRectangle(84, y, 12, 8, OLED_COLOR_NORMAL);
+        OLED_PrintASCIIString(84, y, s, &afont8x6, (ui_tr_focus == dc) ? OLED_COLOR_REVERSED : OLED_COLOR_NORMAL);
+    }
+
+    OLED_PrintString(1, 51, "确认/退出 保存", &font12x12, OLED_COLOR_NORMAL);
+}
+
 /* ========================== 页面绘制 ========================== */
 /* 画当前页, 然后统一补一圈整屏方框(UI_ScreenFrame).
    各页面的坐标约定(与方框留出 1px 黑边, 避免和边框粘在一起):
@@ -1216,6 +1331,7 @@ static void UI_DrawPage(void)
     else if (ui_page == UI_PAGE_MIXED) UI_MixEditPage();
     else if (ui_page == UI_PAGE_CHAN)  UI_ChanPage();
     else if (ui_page == UI_PAGE_VER)   UI_VerPage();
+    else if (ui_page == UI_PAGE_TRIMSET) UI_TrimSetPage();
     else                               UI_StickPage();
 
     /* 对频状态弹窗盖在当前页面内容上, 6 秒后由 UI_Task 清标志 */
@@ -1227,6 +1343,10 @@ static void UI_DrawPage(void)
        必须放在 UI_ScreenFrame 之前, 否则弹窗会压掉整屏方框. */
     if (UI_UsbDetectHigh())
         UI_UsbPopup();
+
+    /* 微调模式弹窗: 盖在所有页面/弹窗之上, 但必须在 UI_ScreenFrame 之前(先画的话方框会被弹窗压掉) */
+    if (trim_mode)
+        UI_TrimPopup();
 
     /* 软关机界面(UI_PwrOffPage)和关机完成页(UI_PowerOffIdle)是整屏自绘的, 不在这里叠加 —— 见 UI_Task 开头分支 */
     UI_ScreenFrame();
@@ -1246,6 +1366,8 @@ void UI_Task(void)
     {
         ui_boot = 0U;                    /* 松手/软关机后清掉上次的上电时刻 */
         ui_bind_popup = 0U;              /* 关机/重新上电时不要带出上次的对频弹窗 */
+        trim_mode = 0U;                  /* 也不带微调模式: 下次上电按 Flash 里的分配重新开始 */
+        (void)Trim_ModeEvent();          /* 丢掉门禁期间攒下的切换请求(锁存前的电源键短按无效) */
         UI_KeyFlush();                   /* 这段 UI 不认按键: 门禁期间按的键(UP/DN/EN/EXIT 四键矩阵)都不算数 */
         if ((pwr_off_done != 0U) && (pwr_hold_ms == 0U))
             UI_PowerOffIdle();           /* 软关机完成: 静态关机页, 等待重新长按开机 */
@@ -1262,6 +1384,7 @@ void UI_Task(void)
     {
         UI_BootAnim(UI_BOOT_MS);
         UI_KeyFlush();                   /* 开机提示期间按的键不算数(电源键 PB13 不在 4 键矩阵里, 见 BoardCfg.h) */
+        (void)Trim_ModeEvent();          /* READY 提示期间的短按也丢掉, 免得一结束就莫名其妙进微调模式 */
         return;
     }
 
@@ -1293,6 +1416,33 @@ void UI_Task(void)
                 CRSF_ParamScanStart();               /* 枚举参数表(模块不支持时最多重试 3 次) */
             }
         }
+    }
+
+    /* 电源键短按 = 切换微调模式(Schedule.c 的 power_detect 判定 40~700ms, 见 PWR_SHORT_MIN/MAX_MS).
+       只有摇杆(0)/16 通道(2)/通道条(7)三页、且不在校准时才允许进入; 退出时立刻落盘.
+       本段在"软关机画面"之后: 微调模式下长按电源键 3s 照样能软关机(上面已 return) */
+    if (Trim_ModeEvent())
+    {
+        if (trim_mode != 0U)
+        {
+            trim_mode = 0U;
+            Store_SaveCalib();               /* 退出即保存微调量(与校准/混控共用同一条 Flash 记录) */
+        }
+        else if ((ui_cal == 0U) &&
+                 ((ui_page == UI_PAGE_STICK) || (ui_page == UI_PAGE_CHAN) || (ui_page == UI_PAGE_CHBAR)))
+        {
+            trim_mode     = 1U;
+            ui_bind_popup = 0U;              /* 微调弹窗优先, 别和对频弹窗叠在一起 */
+        }
+        ui_rep_key = 0xFFU;                  /* 清连发: 手上还按着 UP/DN 也不带进/带出微调模式 */
+        UI_KeyFlush();                       /* 这次按压期间的导航键事件全部作废 */
+    }
+
+    if (trim_mode != 0U)                     /* 微调模式: 四个导航键(=TRIM1~4)只做微调, 菜单/翻页/校准全失效 */
+    {
+        UI_KeyFlush();                       /* Trim_Task(10ms) 直接读引脚, 不走 Key_State_* 队列, 这里清干净 */
+        UI_DrawPage();                       /* 页面 + 微调弹窗 + 整屏方框 */
+        return;
     }
 
     /* 校准: 状态机在 Func.c 里跑, 界面锁在第0页并显示阶段提示 */
@@ -1487,6 +1637,37 @@ void UI_Task(void)
             ui_in_focus = UI_FocusStep(ui_in_focus, 8U, 1U);   /* DOWN */
             if (UI_Key(ENTER)) ui_in_edit  = 1U;
             if (UI_Key(EXIT))  { Store_SaveInput(); ui_page = UI_PAGE_MENU; }
+        }
+    }
+
+    if (ui_page == UI_PAGE_TRIMSET)             /* 微调分配页: 焦点/编辑两态(与输入映射页同构) */
+    {
+        uint8_t i = (uint8_t)(ui_tr_focus / 2U);   /* 偶数 = 微调格, 奇数 = 方向格 */
+
+        if (ui_tr_edit)                         /* 编辑态: UP/DN 改值, ENTER/EXIT 退出保存 */
+        {
+            if (ui_tr_focus & 1U)               /* 方向格: UP = +1 正, DOWN = -1 反 */
+            {
+                if (UI_Key(UP))   aetr_trim_rev[i] = 0U;
+                if (UI_Key(DOWN)) aetr_trim_rev[i] = 1U;
+            }
+            else                                /* 微调格: UP/DN 循环 --/T1~T4 */
+            {
+                uint8_t v = aetr_trim[i];
+
+                if (UI_Key(UP))   v = (uint8_t)((v + 1U) % (TRIM_NUM + 1U));
+                if (UI_Key(DOWN)) v = (uint8_t)((v + TRIM_NUM) % (TRIM_NUM + 1U));
+                aetr_trim[i] = v;
+            }
+            if (UI_Key(ENTER)) { ui_tr_edit = 0U; Store_SaveCalib(); }
+            if (UI_Key(EXIT))  { ui_tr_edit = 0U; Store_SaveCalib(); ui_page = UI_PAGE_MENU; }
+        }
+        else                                    /* 焦点态: UP/DN 循环 8 格, ENTER 进编辑 */
+        {
+            ui_tr_focus = UI_FocusStep(ui_tr_focus, 8U, 0U);   /* UP: 循环焦点(长按加速) */
+            ui_tr_focus = UI_FocusStep(ui_tr_focus, 8U, 1U);   /* DOWN */
+            if (UI_Key(ENTER)) ui_tr_edit = 1U;
+            if (UI_Key(EXIT))  { Store_SaveCalib(); ui_page = UI_PAGE_MENU; }
         }
     }
 

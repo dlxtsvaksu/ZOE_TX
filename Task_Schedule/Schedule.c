@@ -42,6 +42,8 @@ volatile uint8_t flag = 0;
    "调用次数"计数 —— 1ms 槽会被 OLED 推页阻塞 ~3ms 而丢拍, 计数会与进度条/真实时间脱节.
    Ui.c 只负责把 pwr_hold_ms 画成进度条, 所以"条填满那一刻"恒等于"PWR_EN 拉高的那一刻". */
 #define PWR_DEBOUNCE_MS 3U       /* 松手去抖: 低电平连续这么久才算松开(机械键会弹跳) */
+#define PWR_SHORT_MIN_MS 40U     /* 短按下限: 低于这个时长当毛刺(电源键短按 = 切换微调模式) */
+#define PWR_SHORT_MAX_MS 700U    /* 短按上限: 超过就当长按 -> 不动作(UI_PWROFF_SHOW_MS=1000 才进关机画面) */
 
 volatile uint32_t pwr_hold_ms = 0U;   /* 两版都有: Ui.c 拿它画开机进度条 + 判断是否已开机 */
 volatile uint32_t pwr_off_ms  = 0U;   /* 锁存后本次按压已持续(ms), 0 = 没在按: Ui.c 画关机倒计时 */
@@ -66,6 +68,7 @@ void power_detect(void) {
     static uint8_t  hold_act = 0U;   /* 1 = 本次按下已在计时 */
     static uint8_t  rel_ms   = 0U;   /* 松开去抖计数 */
     static uint8_t  off_lock = 0U;   /* 软关机后压住: 松手前不再重新计时/锁存 */
+    static uint8_t  press_lat = 0U;  /* 本次按压的起点是否已在锁存之后(用来排除开机那 1.2s 长按) */
     uint32_t held;
     uint32_t now = HAL_GetTick();
 
@@ -79,8 +82,9 @@ void power_detect(void) {
         }
 
         if (hold_act == 0U) {                /* 按下沿: 从这一刻开始计时 */
-            hold_act = 1U;
-            hold_at  = now;
+            hold_act  = 1U;
+            hold_at   = now;
+            press_lat = pwr_latched;         /* 记下这次按压是不是"开机状态下"开始的 */
         }
         held = now - hold_at;
 
@@ -114,6 +118,17 @@ void power_detect(void) {
         if (rel_ms < PWR_DEBOUNCE_MS) rel_ms++;
 
         if (rel_ms >= PWR_DEBOUNCE_MS) {
+            /* 电源键短按 = 切换微调模式(-> Func.c 的 Trim_ModeToggleReq, UI 在 UI_Task 里消费):
+               只认"已开机之后按下, 按住 40~700ms 就松手"的那一次 ——
+                 开机那一次按压的起点在锁存之前(press_lat = 0) -> 不会误触发;
+                 >=1000ms 是关机画面(UI_PWROFF_SHOW_MS), >=3000ms 是软关机,
+                 700~1000ms 故意留死区: 短按无效也不闪关机画面 */
+            if ((hold_act != 0U) && (press_lat != 0U) && (pwr_off_done == 0U)) {
+                uint32_t held_rel = now - hold_at;
+                if ((held_rel >= PWR_SHORT_MIN_MS) && (held_rel <= PWR_SHORT_MAX_MS))
+                    Trim_ModeToggleReq();
+            }
+            press_lat  = 0U;
             hold_act   = 0U;                 /* 本次计时结束(锁存与否都要清, 否则下次按会误判) */
             pwr_off_ms = 0U;                 /* 松手 = 取消软关机长按计时 */
             if (pwr_latched == 0U) {         /* 没锁存就松手: 进度清零, 可重按 */
@@ -352,6 +367,7 @@ static Task_t tasks[] = {
     { func2,  5, 0 },
     { PPM_Task, 5, 0 },   /* 5ms: ch_out[] -> PPM 脉宽表(混控结果已算好, 见 Ppm.c) */
     { func3, 10, 0 },
+    { Trim_Task, 10, 0 },   /* 10ms: 8 个微调键去抖 + 长按加速(只在微调模式下步进, 见 Func.c) */
     { USB_HID_Task,  5, 0 },   /* USB HID: 5ms 上报一次摇杆/开关 */
     { CRSF_TxTask,   1, 0 },   /* CRSF: 每个 4ms 节拍组一帧 0x16 */
     { CRSF_RxTask,   1, 0 },   /* CRSF: 解析模块下行帧(0x14/0x28...) */

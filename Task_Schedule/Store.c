@@ -22,6 +22,10 @@ typedef struct {
     uint8_t    model;                       /* 当前模型序号 */
     uint8_t    mix_cnt;                     /* 混控总条数(所有模型) */
     Mix_t      mix[MIX_MAX];                /* 混控数组 */
+    /* ---- 微调(同样不参与校验和: 老记录这些字节是 0xFF, 读取时逐项按范围/步长兜底) ---- */
+    uint8_t    aetr_trim[4];                /* 输出 i 挂哪个微调: 0 = 不挂, 1~4 = trim1~trim4 */
+    int16_t    trim_val[TRIM_NUM];          /* 微调量(0.1% 满行程, ±TRIM_LIMIT) */
+    uint8_t    aetr_trim_rev[4];            /* 输出 i 的微调方向: 0 = 正, 1 = 反 */
 } Store_Calib_t;
 
 /* 存储状态(供界面显示): 1 = 成功 */
@@ -60,6 +64,17 @@ uint8_t Store_LoadCalib(void)
         user_adc_calibration[i].ADC_MAX = d->cal[i].ADC_MAX;
         aetr_input[i] = (d->aetr_input[i] < 0) ? (int8_t)-1 : (int8_t)1;
         aetr_src[i]   = (d->aetr_src[i] < 4U) ? d->aetr_src[i] : (uint8_t)i;
+        /* 微调: 老记录(没有这两个字段)读出来是 0xFF, 按范围/步长兜底到默认值 */
+        aetr_trim[i]  = (d->aetr_trim[i] <= TRIM_NUM) ? d->aetr_trim[i] : (uint8_t)(i + 1U);
+        {
+            int16_t tv = d->trim_val[i];
+
+            if ((tv > TRIM_LIMIT) || (tv < -TRIM_LIMIT) || ((tv % TRIM_STEP) != 0))
+                tv = 0;                         /* 越界或不是 TRIM_STEP 的整数倍(老记录 = -1) -> 归零 */
+            trim_val[i] = tv;
+        }
+        /* 方向: 老记录 0xFF -> 0(正) */
+        aetr_trim_rev[i] = (d->aetr_trim_rev[i] <= 1U) ? d->aetr_trim_rev[i] : 0U;
     }
     model_cur = (d->model < MODEL_MAX) ? d->model : 0U;   /* 模型号越界则回 0 */
     store_ld_ok = 1U;
@@ -125,6 +140,15 @@ uint8_t Store_SaveCalib(void)
         ram.cal[i].ADC_MAX = user_adc_calibration[i].ADC_MAX;
         ram.aetr_input[i]  = (aetr_input[i] < 0) ? (int8_t)-1 : (int8_t)1;   /* ±1 归一 */
         ram.aetr_src[i]    = (aetr_src[i] < 4U) ? aetr_src[i] : (uint8_t)i;
+        ram.aetr_trim[i]   = (aetr_trim[i] <= TRIM_NUM) ? aetr_trim[i] : (uint8_t)(i + 1U);
+        {
+            int16_t tv = trim_val[i];
+
+            if (tv >  TRIM_LIMIT) tv =  TRIM_LIMIT;
+            if (tv < -TRIM_LIMIT) tv = -TRIM_LIMIT;
+            ram.trim_val[i] = tv;
+        }
+        ram.aetr_trim_rev[i] = (aetr_trim_rev[i] != 0U) ? 1U : 0U;
     }
     ram.model   = (uint8_t)model_cur;
     ram.mix_cnt = 0U;

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "main.h"
 #include "Store.h"
+#include "BoardCfg.h"   /* BOARD_PWR_HAS_LATCH: 自锁开关版没有电源键, 微调模式改用板上的 TRIM_MODE 键 */
 volatile ADC_CALI_t user_adc_calibration[4]={
     {0,2048,4096},
     {0,2048,4096},
@@ -86,6 +87,27 @@ void Adc_convert_Crsf(void){
                 aetr[i]=(raw-mid)*(crsf_max-crsf_mid)/(user_adc_calibration[s].ADC_MAX-mid)+crsf_mid;
             else
                 aetr[i]=crsf_mid-(mid-raw)*(crsf_mid-crsf_min)/(mid-user_adc_calibration[s].ADC_MIN);
+
+            /* 微调: 叠加到通道值上(放在方向镜像之前 -> 微调跟随通道正反, 与常规遥控一致).
+               aetr_trim[i] = 0 表示该输出不挂微调; aetr_trim_rev[i] = 1 表示该输出的微调取反;
+               1000 = 满行程 */
+            {
+                uint8_t ti = aetr_trim[i];
+
+                if ((ti >= 1U) && (ti <= TRIM_NUM))
+                {
+                    int16_t off = Trim_Counts((uint8_t)(ti - 1U));
+                    int32_t v;
+
+                    if (aetr_trim_rev[i] != 0U)
+                        off = (int16_t)(-off);              /* 反: 微调在该输出上取反 */
+                    v = (int32_t)aetr[i] + (int32_t)off;
+
+                    if (v > (int32_t)crsf_max) v = (int32_t)crsf_max;
+                    if (v < (int32_t)crsf_min) v = (int32_t)crsf_min;
+                    aetr[i] = (uint16_t)v;
+                }
+            }
 
             /* 通道方向: aetr_input = -1 则围绕中位镜像(反向) */
             if(aetr_input[i] < 0)
@@ -321,6 +343,160 @@ void Switch_Read(void){
     {Switch_State[5]=crsf_max;}
     else {Switch_State[5]=crsf_min;}
 }
+/*============================微调(trim)=============================
+   4 个微调 trim1~trim4, 每个由一对实体按键控制(前一个减, 后一个加):
+     trim1 = TRIM6 / TRIM7      trim2 = TRIM5 / TRIM8
+     trim3 = TRIM2 / TRIM3(与导航键 EXIT / ENTER 同脚)
+     trim4 = TRIM4 / TRIM1(与导航键 DOWN / UP    同脚)
+   所以只有 trim_mode = 1(短按电源键进入, 见 Ui.c 的 UI_Task)时才让这 8 个键产生步进,
+   平时它们仍旧只当导航键用(两套逻辑互不干扰: 这里直接读引脚, 不碰 Key_State_* 队列).
+   微调量单位 0.1% 满行程: ±TRIM_LIMIT(200) = ±20%, 单击 TRIM_STEP(5) = 0.5% */
+volatile int16_t trim_val[TRIM_NUM] = {0, 0, 0, 0};
+volatile uint8_t aetr_trim[4]       = {1, 2, 3, 4};   /* 默认 trim1->Ail, trim2->Ele, trim3->Thr, trim4->Rud */
+volatile uint8_t aetr_trim_rev[4]   = {0, 0, 0, 0};   /* 输出 i 的微调方向: 0 = 正, 1 = 反 */
+volatile uint8_t trim_mode          = 0U;             /* 1 = 微调模式(UI 负责开关并落盘) */
+
+#define TRIM_DEB_N       2U     /* 连续 2 拍(20ms)电平一致才认 */
+#define TRIM_REP_DELAY   400U   /* 按住多久起连发(ms) */
+#define TRIM_REP_IV0     90U    /* 连发起始间隔(ms) */
+#define TRIM_REP_IV_MIN  25U    /* 连发最快间隔(ms) */
+#define TRIM_REP_ACCEL   8U     /* 每连发一步缩短的间隔(ms) */
+#define TRIM_REP_MAX     200U   /* 加速计数上限(到顶后保持最快间隔) */
+
+typedef struct {
+    GPIO_TypeDef *port;
+    uint16_t      pin;
+    uint8_t       idx;      /* 微调号 0~3 */
+    int8_t        dir;      /* -1 = 减, +1 = 加 */
+} Trim_Btn_t;
+
+/* 8 个实体微调键 -> (微调号, 增减): 前一个键减, 后一个键加 */
+static const Trim_Btn_t trim_btn[8] = {
+    { TRIM6_GPIO_Port, TRIM6_Pin, 0U, -1 }, { TRIM7_GPIO_Port, TRIM7_Pin, 0U, +1 },
+    { TRIM5_GPIO_Port, TRIM5_Pin, 1U, -1 }, { TRIM8_GPIO_Port, TRIM8_Pin, 1U, +1 },
+    { TRIM2_GPIO_Port, TRIM2_Pin, 2U, -1 }, { TRIM3_GPIO_Port, TRIM3_Pin, 2U, +1 },
+    { TRIM4_GPIO_Port, TRIM4_Pin, 3U, -1 }, { TRIM1_GPIO_Port, TRIM1_Pin, 3U, +1 },
+};
+
+static volatile uint8_t trim_req = 0U;   /* 1 = 有一次"切换微调模式"请求(电源键短按 -> Trim_ModeToggleReq) */
+static uint8_t  trim_lvl[8];             /* 去抖后的按住状态 */
+static uint8_t  trim_raw[8];             /* 上次原始电平 */
+static uint8_t  trim_cnt[8];             /* 连续一致次数 */
+static uint32_t trim_t0[8];              /* 按下时刻 */
+static uint32_t trim_tl[8];              /* 上次步进时刻 */
+static uint16_t trim_n[8];               /* 已连发步数(加速用) */
+
+/* 微调量 -> 通道 counts: 1000 = 满行程(crsf_max - crsf_min) */
+int16_t Trim_Counts(uint8_t n)
+{
+    if (n >= TRIM_NUM)
+        return 0;
+    return (int16_t)(((int32_t)trim_val[n] * (int32_t)(crsf_max - crsf_min)) / 1000);
+}
+
+/* 请求切换微调模式(由 Schedule.c 的电源键短按调用: 1ms 槽, 只置标志不阻塞) */
+void Trim_ModeToggleReq(void)
+{
+    trim_req = 1U;
+}
+
+/* UI 消费一次切换请求: 1 = 有一次 */
+uint8_t Trim_ModeEvent(void)
+{
+    if (trim_req == 0U)
+        return 0U;
+    trim_req = 0U;
+    return 1U;
+}
+
+/* 连发间隔: 从 iv0 起每步减 accel, 最快到 iv_min */
+static uint32_t Trim_Iv(uint16_t n)
+{
+    uint32_t dec = (uint32_t)n * TRIM_REP_ACCEL;
+
+    return (dec >= (TRIM_REP_IV0 - TRIM_REP_IV_MIN)) ? (uint32_t)TRIM_REP_IV_MIN
+                                                    : (uint32_t)(TRIM_REP_IV0 - dec);
+}
+
+/* 一步微调(只有微调模式才动) */
+static void Trim_Step(uint8_t k)
+{
+    int16_t v;
+
+    if (trim_mode == 0U)
+        return;
+    v = (int16_t)((int16_t)trim_val[trim_btn[k].idx] + (int16_t)(trim_btn[k].dir * TRIM_STEP));
+    if (v >  TRIM_LIMIT) v =  TRIM_LIMIT;
+    if (v < -TRIM_LIMIT) v = -TRIM_LIMIT;
+    trim_val[trim_btn[k].idx] = v;
+}
+
+/* 10ms 槽: 8 个微调键去抖 + 长按加速(独立于 UI 的连发逻辑) */
+void Trim_Task(void)
+{
+    uint32_t now = HAL_GetTick();
+
+    for (uint8_t k = 0U; k < 8U; k++)
+    {
+        uint8_t raw = (HAL_GPIO_ReadPin(trim_btn[k].port, trim_btn[k].pin) == GPIO_PIN_RESET) ? 1U : 0U;
+
+        if (raw == trim_raw[k])
+        {
+            if (trim_cnt[k] < TRIM_DEB_N) trim_cnt[k]++;
+        }
+        else
+        {
+            trim_raw[k] = raw;
+            trim_cnt[k] = 0U;
+        }
+        if (trim_cnt[k] < TRIM_DEB_N)
+            continue;                       /* 还在抖动 */
+
+        if (trim_lvl[k] != raw)             /* 电平变化(按下/松开) */
+        {
+            trim_lvl[k] = raw;
+            if (raw != 0U)
+            {
+                Trim_Step(k);               /* 按下边沿: 立刻一步 */
+                trim_t0[k] = now;
+                trim_tl[k] = now;
+                trim_n[k]  = 0U;
+            }
+        }
+        else if ((raw != 0U) && (trim_mode != 0U))
+        {
+            uint32_t iv;
+
+            if ((now - trim_t0[k]) < TRIM_REP_DELAY)
+                continue;                   /* 还没到连发时刻 */
+            iv = Trim_Iv(trim_n[k]);
+            while ((now - trim_tl[k]) >= iv)   /* 补步(now 固定 -> 循环必然收敛) */
+            {
+                trim_tl[k] += iv;
+                Trim_Step(k);
+                if (trim_n[k] < TRIM_REP_MAX) trim_n[k]++;
+                iv = Trim_Iv(trim_n[k]);
+            }
+        }
+    }
+
+#if !BOARD_PWR_HAS_LATCH
+    /* 自锁开关版: 没有电源键可用, 用板上的 TRIM_MODE 键(PA14, 上拉, 按下读低)当切换键 */
+    {
+        static uint8_t tm_raw = 0U, tm_cnt = 0U, tm_lvl = 0U;
+        uint8_t raw = (HAL_GPIO_ReadPin(TRIM_MODE_GPIO_Port, TRIM_MODE_Pin) == GPIO_PIN_RESET) ? 1U : 0U;
+
+        if (raw == tm_raw) { if (tm_cnt < TRIM_DEB_N) tm_cnt++; }
+        else { tm_raw = raw; tm_cnt = 0U; }
+        if ((tm_cnt >= TRIM_DEB_N) && (tm_lvl != raw))
+        {
+            tm_lvl = raw;
+            if (raw != 0U) trim_req = 1U;
+        }
+    }
+#endif
+}
+
 /*============================按键=============================*/
 volatile uint8_t Key_State_Queue[4]={0};
 volatile uint8_t Key_State_Now[4]={0};
