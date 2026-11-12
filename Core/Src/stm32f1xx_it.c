@@ -334,5 +334,13 @@ void USART2_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-
+/**
+  * @brief  USB 低优先级中断 (与 CAN1 RX0 共用向量)。
+  *         手写在 USER CODE 段内: CubeMX 只有在 NVIC 页勾选 USB 中断时
+  *         才会生成同名函数; 若以后在 CubeMX 里勾选了, 请删掉这里。
+  */
+void USB_LP_CAN1_RX0_IRQHandler(void)
+{
+  HAL_PCD_IRQHandler(&hpcd_USB_FS);
+}
 /* USER CODE END 1 */
