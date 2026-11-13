@@ -5,13 +5,16 @@
 ```text
 hardware/
 ├─ pcb/
-│  ├─ <EDA 源工程>          # KiCad(.kicad_pro/.kicad_sch/.kicad_pcb) / AD(.PrjPcb/.SchDoc/.PcbDoc) / 立创EDA 工程
-│  ├─ zoe_tx_v1.2_sch.pdf   # 原理图 PDF(方便没装 EDA 的人查看)
-│  └─ fabrication/          # Gerber zip、BOM、坐标文件、贴片图
+│  ├─ zoe_tx_v1.2_lceda_pro_2026-11-13.epro2   # 立创EDA 专业版工程包(PCB 源工程)
+│  ├─ zoe_tx_v1.2_sch.pdf                     # 原理图 PDF(方便没装 EDA 的人查看)
+│  └─ fabrication/
+│     ├─ zoe_tx_v1.2_gerber_2026-11-13.zip    # Gerber 各层 + 钻孔文件
+│     ├─ zoe_tx_v1.2_bom.csv                  # BOM(待补充)
+│     └─ zoe_tx_v1.2_pick_and_place.csv       # 坐标文件(待补充)
 └─ enclosure/
-   ├─ <CAD 源工程>          # Fusion360 .f3d / SolidWorks .SLDPRT/.SLDASM / FreeCAD .FCStd
-   ├─ zoe_tx_v1.2_case.step # 中性格式, 任何人可打开
-   └─ zoe_tx_v1.2_case.stl  # 直接 3D 打印用
+   ├─ zoe_tx_v1.2_enclosure.step             # 中性格式, 任何人可打开
+   ├─ zoe_tx_v1.2_enclosure_case.3mf         # 外壳, 直接 3D 打印
+   └─ zoe_tx_v1.2_enclosure_buttons.3mf      # 按键, 直接 3D 打印
 ```
 
 ## 上传前检查

@@ -21,3 +21,12 @@
 *.bin  binary
 *.hex  binary
 *.elf  binary
+
+# 硬件资料: STEP 是文本格式, 但必须按二进制存, 否则 CRLF 转换会改变文件内容
+*.step  binary
+*.stp   binary
+*.stl   binary
+*.3mf   binary
+*.zip   binary
+*.epro  binary
+*.epro2 binary
