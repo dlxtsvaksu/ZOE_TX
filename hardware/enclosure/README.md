@@ -8,7 +8,7 @@
 | `zoe_tx_v1.2_enclosure_case.3mf` | 外壳，切好片的 3D 打印文件 |
 | `zoe_tx_v1.2_enclosure_buttons.3mf` | 按键，切好片的 3D 打印文件 |
 
-打印建议：外壳 0.2 mm 层高、3 壁、PLA/PETG 均可；按键建议 0.12~0.16 mm 层高以获得更好的手感。
+打印提示：打印参数（层高、壁数、材料）请按自己的打印机校准；建议先打印按键验证与外壳的配合公差。
 
 命名建议：`zoe_tx_v1.2_<零件>_<版本>.step`，例如 `zoe_tx_v1.2_case_top_v1.step`。
 
