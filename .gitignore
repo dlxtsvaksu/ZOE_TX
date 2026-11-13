@@ -1,3 +1,28 @@
-build
-mx.scratch
-!.settings
+# ---------- 构建产物 / CubeIDE 临时文件 ----------
+build/
+build-*/
+mx.scratch/
+
+# ---------- 本地 IDE 与工具链缓存(保留在本地, 不入库) ----------
+.settings/
+.cache/
+compile_commands.json
+*.log
+
+# ---------- 编译中间件与固件镜像 ----------
+*.o
+*.d
+*.su
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.axf
+
+# ---------- 操作系统 / 编辑器 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.swp
