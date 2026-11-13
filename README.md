@@ -1,6 +1,7 @@
 # ZOE_TX V1.2
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/dlxtsvaksu/ZOE_TX)](https://github.com/dlxtsvaksu/ZOE_TX/releases/latest)
 ![MCU](https://img.shields.io/badge/MCU-STM32F103C8T6-blue)
 ![Toolchain](https://img.shields.io/badge/toolchain-arm--none--eabi--gcc%2014.3.1-lightgrey)
 ![Build](https://img.shields.io/badge/build-CMake%20%2B%20Ninja-informational)
@@ -47,6 +48,14 @@
 | 开关 C / D | PB0+PB1 / PC14+PC15 | 双引脚组合，可区分三档 |
 | 微调 / 导航键 | PB8 PB7 PB5 PB4 PB3 PA15 PA10 PA9 | TRIM1~TRIM8，输入上拉；UP=TRIM1、DOWN=TRIM4、ENTER=TRIM3、EXIT=TRIM2 |
 | 调试口 | PA13 / PA14 | 固件关闭了 SWJ（见下方「烧录与调试」） |
+
+## 下载固件
+
+已编译好的固件见 [Releases](https://github.com/dlxtsvaksu/ZOE_TX/releases/latest)：
+
+- `ZOE_TX_V1.2.elf` —— 带符号，STM32CubeProgrammer / ST-Link 直接下载
+- `ZOE_TX_V1.2.bin` —— 裸二进制，烧录地址 `0x08000000`
+- `ZOE_TX_V1.2.hex` —— Intel HEX，任意 STM32 烧录工具可用
 
 ## 构建
 
@@ -119,12 +128,21 @@ ZOE_TX_V1.2/
 │  ├─ BoardCfg.h         #   硬件版本开关(自锁开关版 / 长按开关机版)
 │  └─ usbd_conf.c, usbd_desc.c  # USB 设备配置与描述符
 ├─ oled_multi/           # OLED 驱动 + 中英文字库(移植自 keysking 教程驱动)
+├─ hardware/             # PCB / 外壳源文件与制造文件(见 hardware/README.md)
+├─ docs/images/          # README 用界面截图与实物照片
 ├─ cmake/                # 工具链文件 + CubeMX 源文件列表
 ├─ ZOE_TX_V1.2.ioc       # STM32CubeMX 工程
 ├─ CMakeLists.txt / CMakePresets.json
 ├─ STM32F103xx_FLASH.ld  # 链接脚本
 └─ startup_stm32f103xb.s # 启动文件
 ```
+
+## 硬件资料（PCB / 外壳 / 图片）
+
+- PCB 源工程、Gerber / BOM / 坐标文件：`hardware/pcb/`
+- 外壳 3D 模型（STEP / STL / CAD 源工程）：`hardware/enclosure/`
+- 界面截图与实物照片：`docs/images/`（README 中直接引用）
+- 命名规范、体积限制、隐私检查与硬件许可说明见 [hardware/README.md](hardware/README.md)
 
 ## 常用配置项
 

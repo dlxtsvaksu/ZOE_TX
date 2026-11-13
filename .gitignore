@@ -20,6 +20,14 @@ compile_commands.json
 *.lst
 *.axf
 
+# ---------- EDA / CAD 临时文件 ----------
+*.kicad_prl
+*-backups/
+*-backup/
+_autosave-*
+*.lck
+Project Outputs for */
+
 # ---------- 操作系统 / 编辑器 ----------
 .DS_Store
 Thumbs.db
