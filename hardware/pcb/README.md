@@ -4,8 +4,8 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `zoe_tx_v1.2_lceda_pro_2026-11-13.epro2` | 立创EDA 专业版工程包（PCB 源工程，可直接导入修改） |
-| `fabrication/zoe_tx_v1.2_gerber_2026-11-13.zip` | Gerber 制造文件：顶层/底层、丝印、阻焊、钢网、板框、钻孔（共 15 个文件） |
+| `zoe_tx_v1.2_lceda_pro_2026-11-15.epro2` | 立创EDA 专业版工程包（PCB 源工程，可直接导入修改） |
+| `fabrication/zoe_tx_v1.2_gerber_2026-11-15.zip` | Gerber 制造文件（15 项）：顶层/底层、丝印、阻焊、钢网、板框、钻孔（含过孔）、飞针测试、下单说明 |
 
 待补充：
 
