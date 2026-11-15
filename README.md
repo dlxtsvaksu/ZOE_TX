@@ -17,7 +17,7 @@
 
 ![正面](images/60c9793af56ae319345aaf874326a2a5.jpg)
 
-![背面](1mages/2.jpg)
+![背面](1mages/a0bcb7c351d35d12a098b7bba7549ae8.jpg)
 
 ![内部结构](images/3.jpg)
 ## 功能特性
