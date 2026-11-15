@@ -17,9 +17,6 @@
 
 ![正面](images/60c9793af56ae319345aaf874326a2a5.jpg)
 
-![背面](1mages/a0bcb7c351d35d12a098b7bba7549ae8.jpg)
-
-![内部结构](images/3.jpg)
 ## 功能特性
 
 - **CRSF 双向通信**：USART2 @ 400 kbaud（DMA 收发），TIM1 每 4 ms 触发一次，250 Hz 发送 `0x16` 遥控帧；
